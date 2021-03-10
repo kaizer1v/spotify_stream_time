@@ -1,0 +1,270 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Spotify API Exploration</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <style type="text/css">
+      #login, #loggedin {
+        display: none;
+      }
+      .text-overflow {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 500px;
+      }
+    </style>
+  </head>
+
+  <body>
+<div class="container">
+  <div id="login">
+    <h1>This is an example of the Authorization Code flow</h1>
+    <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+  </div>
+  <div id="loggedin">
+    <div id="user-profile"></div>
+    <hr />
+    <h1>Top Playlists</h1>
+    <div id="user-playlists"></div>
+    <hr />
+    <div id="oauth">
+    </div>
+    <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button>
+  </div>
+</div>
+
+<script id="user-profile-template" type="text/x-handlebars-template">
+  <h1>Logged in as {{display_name}}</h1>
+  <div class="media">
+    <div class="pull-left">
+      <img class="media-object" width="150" src="{{images.0.url}}" />
+    </div>
+    <div class="media-body">
+      <dl class="dl-horizontal">
+        <dt>Display name</dt><dd class="clearfix">{{display_name}}</dd>
+        <dt>Id</dt><dd>{{id}}</dd>
+        <dt>Email</dt><dd>{{email}}</dd>
+        <dt>Spotify URI</dt><dd><a href="{{external_urls.spotify}}">{{external_urls.spotify}}</a></dd>
+        <dt>Link</dt><dd><a href="{{href}}">{{href}}</a></dd>
+        <dt>Profile Image</dt><dd class="clearfix"><a href="{{images.0.url}}">{{images.0.url}}</a></dd>
+        <dt>Country</dt><dd>{{country}}</dd>
+      </dl>
+    </div>
+  </div>
+</script>
+
+<script id="user-playlists-template" type="text/x-handlebars-template">
+  {{#each pl}}
+    <div>
+      <img src="{{playlist_cover}}" alt="album cover" />
+      <h3><b>{{playlist_name}}</b></h3>
+      <p>Total tracks: {{total_tracks}}</p>
+      <p>Median scores for the playlist by the following</p>
+      <ul>
+        <li>Median Danceability score -> {{danceability}}</li>
+        <li>Median Energy score -> {{energy}}</li>
+        <li>Median Acousticness score -> {{acousticness}}</li>
+        <li>Median Instrumentalness score -> {{instrumentalness}}</li>
+        <li>Median Liveness score -> {{liveness}}</li>
+        <li>Median Loudness score -> {{loudness}}</li>
+        <li>Median Speechiness score -> {{speechiness}}</li>
+        <li>Median Tempo score -> {{tempo}}</li>
+        <li>Median Valence score -> {{valence}}</li>
+      </ul>
+    </div>
+    <hr />
+  {{/each}}
+</script>
+
+<script id="oauth-template" type="text/x-handlebars-template">
+  <h2>oAuth info</h2>
+  <dl class="dl-horizontal">
+    <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+    <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+  </dl>
+</script>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.5.0/d3.min.js"></script>
+<script>
+  (function() {
+
+    /**
+     * Obtains parameters from the hash of the URL
+     * @return Object
+     */
+    function getHashParams() {
+      var hashParams = {};
+      var e, r = /([^&;=]+)=?([^&;]*)/g,
+          q = window.location.hash.substring(1);
+      while ( e = r.exec(q)) {
+         hashParams[e[1]] = decodeURIComponent(e[2]);
+      }
+      return hashParams;
+    }
+
+    /* Handlebars */
+    var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+        userProfileTemplate = Handlebars.compile(userProfileSource),
+        userProfilePlaceholder = document.getElementById('user-profile');
+
+    var userPlaylistsSource = document.getElementById('user-playlists-template').innerHTML,
+        userPlaylistsTemplate = Handlebars.compile(userPlaylistsSource),
+        userPlaylistsPlaceholder = document.getElementById('user-playlists');
+
+
+    var oauthSource = document.getElementById('oauth-template').innerHTML,
+        oauthTemplate = Handlebars.compile(oauthSource),
+        oauthPlaceholder = document.getElementById('oauth');
+
+    var params = getHashParams();
+
+    var access_token = params.access_token,
+        refresh_token = params.refresh_token,
+        error = params.error;
+
+    if(error) {
+      alert('There was an error during the authentication');
+    } else {
+      if(access_token) {
+        // render oauth info
+        oauthPlaceholder.innerHTML = oauthTemplate({
+          access_token: access_token,
+          refresh_token: refresh_token
+        });
+
+        $.ajax({
+            url: 'https://api.spotify.com/v1/me',
+            headers: {
+              'Authorization': 'Bearer ' + access_token
+            },
+            success: function(response) {
+              userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+
+              $('#login').hide();
+              $('#loggedin').show();
+            }
+        });
+
+        // Get user playlists
+        // $.ajax({
+        //     url: 'https://api.spotify.com/v1/me/playlists',
+        //     headers: {
+        //       'Authorization': 'Bearer ' + access_token
+        //     },
+        //     data: {
+        //       limit: 50
+        //     }
+        // }).then(function(response) {
+        //   var top_max = 5;
+        //   var top_playlists = d3.sort(response['items'], (a, b) => d3.descending(a['tracks']['total'], b['tracks']['total'])).slice(0, top_max);            // choose top 5 playlists by track count
+        //   var req_get_tracks = [];
+        //   var pl_objs = [];
+
+        //   // create array of all ajax requests
+        //   for(let i = 0; i < top_max; i++) {
+        //     pl_objs.push({
+        //       'playlist_id': top_playlists[i]['id'],
+        //       'playlist_name': top_playlists[i]['name'],
+        //       'playlist_cover': top_playlists[i]['images'][top_playlists[i]['images'].length - 1]['url'],
+        //       'total_tracks': top_playlists[i]['tracks']['total']
+        //     })
+
+        //     req_get_tracks.push(
+        //       $.ajax({
+        //         url: top_playlists[i]['tracks']['href'],
+        //         headers: {
+        //           'Authorization': 'Bearer ' + access_token
+        //         },
+        //         data: {
+        //           limit: 100,
+        //           offset: 0,
+        //           fields: 'items(track(id))'      // get `items[i]['track']['id']`
+        //         }
+        //       })
+        //     )
+        //   }
+
+        //   // ONLY WHEN all of them are resolved, proceed further
+        //   Promise.all(req_get_tracks).then(function(pl_tracks) {
+        //     var track_ids_str = pl_tracks.map(function(tracks) {
+        //       return tracks['items'].map(d => d.track.id).join(',')
+        //     })
+
+        //     var ajax_reqs_l2 = [];
+        //     for(let i = 0; i < track_ids_str.length; i++) {
+        //       ajax_reqs_l2.push(
+        //         $.ajax({
+        //           url: 'https://api.spotify.com/v1/audio-features',
+        //           headers: {
+        //             'Authorization': 'Bearer ' + access_token
+        //           },
+        //           data: {
+        //             ids: track_ids_str[i]
+        //           }
+        //         })
+        //       )
+        //     }
+
+        //     // console.log(ajax_reqs_l2);
+        //     Promise.all(ajax_reqs_l2).then(function(pl_features) {
+        //       for(let i = 0; i < top_max; i++) {
+        //         pl_objs[i]['danceability'] = d3.median(pl_features[i]['audio_features'], d => d['danceability'])
+        //         pl_objs[i]['energy'] = d3.median(pl_features[i]['audio_features'], d => d['energy'])
+        //         pl_objs[i]['acousticness'] = d3.median(pl_features[i]['audio_features'], d => d['acousticness'])
+        //         pl_objs[i]['instrumentalness'] = d3.median(pl_features[i]['audio_features'], d => d['instrumentalness'])
+        //         pl_objs[i]['liveness'] = d3.median(pl_features[i]['audio_features'], d => d['liveness'])
+        //         pl_objs[i]['loudness'] = d3.median(pl_features[i]['audio_features'], d => d['loudness'])
+        //         pl_objs[i]['speechiness'] = d3.median(pl_features[i]['audio_features'], d => d['speechiness'])
+        //         pl_objs[i]['tempo'] = d3.median(pl_features[i]['audio_features'], d => d['tempo'])
+        //         pl_objs[i]['valence'] = d3.median(pl_features[i]['audio_features'], d => d['valence'])
+        //       }
+        //       console.log(pl_objs);
+        //       userPlaylistsPlaceholder.innerHTML = userPlaylistsTemplate({ pl: pl_objs })
+        //     })
+        //   });
+        // });
+
+
+        // Get user top tracks
+        $.ajax({
+          url: 'https://api.spotify.com/v1/me/top/tracks',
+          headers: {
+            'Authorization': 'Bearer ' + access_token
+          },
+          data: {
+            limit: 50
+          }
+        }).then(function(resp) {
+          var top_tracks = [];
+          console.log(resp);
+        })
+
+      } else {
+          // render initial screen
+          $('#login').show();
+          $('#loggedin').hide();
+      }
+
+      document.getElementById('obtain-new-token').addEventListener('click', function() {
+        $.ajax({
+          url: '/refresh_token',
+          data: {
+            'refresh_token': refresh_token
+          }
+        }).done(function(data) {
+          access_token = data.access_token;
+          oauthPlaceholder.innerHTML = oauthTemplate({
+            access_token: access_token,
+            refresh_token: refresh_token
+          });
+        });
+      }, false);
+    }
+  })();
+</script>
+</body>
+</html>
+
