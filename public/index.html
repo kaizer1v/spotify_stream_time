@@ -19,7 +19,7 @@
   <body>
 <div class="container">
   <div id="login">
-    <h1>This is an example of the Authorization Code flow</h1>
+    <h1>That's what Spotify Said</h1>
     <a href="/login" class="btn btn-primary">Log in with Spotify</a>
   </div>
   <div id="loggedin">
@@ -60,17 +60,17 @@
       <img src="{{playlist_cover}}" alt="album cover" />
       <h3><b>{{playlist_name}}</b></h3>
       <p>Total tracks: {{total_tracks}}</p>
-      <p>Median scores for the playlist by the following</p>
+      <p>Mean scores for the playlist by the following</p>
       <ul>
-        <li>Median Danceability score -> {{danceability}}</li>
-        <li>Median Energy score -> {{energy}}</li>
-        <li>Median Acousticness score -> {{acousticness}}</li>
-        <li>Median Instrumentalness score -> {{instrumentalness}}</li>
-        <li>Median Liveness score -> {{liveness}}</li>
-        <li>Median Loudness score -> {{loudness}}</li>
-        <li>Median Speechiness score -> {{speechiness}}</li>
-        <li>Median Tempo score -> {{tempo}}</li>
-        <li>Median Valence score -> {{valence}}</li>
+        <li>Mean Danceability score -> {{danceability}}</li>
+        <li>Mean Energy score -> {{energy}}</li>
+        <li>Mean Acousticness score -> {{acousticness}}</li>
+        <li>Mean Instrumentalness score -> {{instrumentalness}}</li>
+        <li>Mean Liveness score -> {{liveness}}</li>
+        <li>Mean Loudness score -> {{loudness}}</li>
+        <li>Mean Speechiness score -> {{speechiness}}</li>
+        <li>Mean Tempo score -> {{tempo}}</li>
+        <li>Mean Valence score -> {{valence}}</li>
       </ul>
     </div>
     <hr />
@@ -135,6 +135,8 @@
           refresh_token: refresh_token
         });
 
+        var categorise_value = d3.scaleThreshold().domain([.5, .75, 1]).range(['low', 'med', 'high'])
+
         $.ajax({
             url: 'https://api.spotify.com/v1/me',
             headers: {
@@ -148,99 +150,104 @@
             }
         });
 
-        // Get user playlists
-        // $.ajax({
-        //     url: 'https://api.spotify.com/v1/me/playlists',
-        //     headers: {
-        //       'Authorization': 'Bearer ' + access_token
-        //     },
-        //     data: {
-        //       limit: 50
-        //     }
-        // }).then(function(response) {
-        //   var top_max = 5;
-        //   var top_playlists = d3.sort(response['items'], (a, b) => d3.descending(a['tracks']['total'], b['tracks']['total'])).slice(0, top_max);            // choose top 5 playlists by track count
-        //   var req_get_tracks = [];
-        //   var pl_objs = [];
-
-        //   // create array of all ajax requests
-        //   for(let i = 0; i < top_max; i++) {
-        //     pl_objs.push({
-        //       'playlist_id': top_playlists[i]['id'],
-        //       'playlist_name': top_playlists[i]['name'],
-        //       'playlist_cover': top_playlists[i]['images'][top_playlists[i]['images'].length - 1]['url'],
-        //       'total_tracks': top_playlists[i]['tracks']['total']
-        //     })
-
-        //     req_get_tracks.push(
-        //       $.ajax({
-        //         url: top_playlists[i]['tracks']['href'],
-        //         headers: {
-        //           'Authorization': 'Bearer ' + access_token
-        //         },
-        //         data: {
-        //           limit: 100,
-        //           offset: 0,
-        //           fields: 'items(track(id))'      // get `items[i]['track']['id']`
-        //         }
-        //       })
-        //     )
-        //   }
-
-        //   // ONLY WHEN all of them are resolved, proceed further
-        //   Promise.all(req_get_tracks).then(function(pl_tracks) {
-        //     var track_ids_str = pl_tracks.map(function(tracks) {
-        //       return tracks['items'].map(d => d.track.id).join(',')
-        //     })
-
-        //     var ajax_reqs_l2 = [];
-        //     for(let i = 0; i < track_ids_str.length; i++) {
-        //       ajax_reqs_l2.push(
-        //         $.ajax({
-        //           url: 'https://api.spotify.com/v1/audio-features',
-        //           headers: {
-        //             'Authorization': 'Bearer ' + access_token
-        //           },
-        //           data: {
-        //             ids: track_ids_str[i]
-        //           }
-        //         })
-        //       )
-        //     }
-
-        //     // console.log(ajax_reqs_l2);
-        //     Promise.all(ajax_reqs_l2).then(function(pl_features) {
-        //       for(let i = 0; i < top_max; i++) {
-        //         pl_objs[i]['danceability'] = d3.median(pl_features[i]['audio_features'], d => d['danceability'])
-        //         pl_objs[i]['energy'] = d3.median(pl_features[i]['audio_features'], d => d['energy'])
-        //         pl_objs[i]['acousticness'] = d3.median(pl_features[i]['audio_features'], d => d['acousticness'])
-        //         pl_objs[i]['instrumentalness'] = d3.median(pl_features[i]['audio_features'], d => d['instrumentalness'])
-        //         pl_objs[i]['liveness'] = d3.median(pl_features[i]['audio_features'], d => d['liveness'])
-        //         pl_objs[i]['loudness'] = d3.median(pl_features[i]['audio_features'], d => d['loudness'])
-        //         pl_objs[i]['speechiness'] = d3.median(pl_features[i]['audio_features'], d => d['speechiness'])
-        //         pl_objs[i]['tempo'] = d3.median(pl_features[i]['audio_features'], d => d['tempo'])
-        //         pl_objs[i]['valence'] = d3.median(pl_features[i]['audio_features'], d => d['valence'])
-        //       }
-        //       console.log(pl_objs);
-        //       userPlaylistsPlaceholder.innerHTML = userPlaylistsTemplate({ pl: pl_objs })
-        //     })
-        //   });
-        // });
-
-
-        // Get user top tracks
+        // Part 1 - Get user playlists
         $.ajax({
-          url: 'https://api.spotify.com/v1/me/top/tracks',
-          headers: {
-            'Authorization': 'Bearer ' + access_token
-          },
-          data: {
-            limit: 50
+            url: 'https://api.spotify.com/v1/me/playlists',
+            headers: {
+              'Authorization': 'Bearer ' + access_token
+            },
+            data: {
+              limit: 50
+            }
+        }).then(function(response) {
+          var top_max = 5;
+          var top_playlists = d3.sort(response['items'], (a, b) => d3.descending(a['tracks']['total'], b['tracks']['total'])).slice(0, top_max);            // choose top 5 playlists by track count
+          var req_get_tracks = [];
+          var pl_objs = [];
+
+          // create array of all ajax requests
+          for(let i = 0; i < top_max; i++) {
+            pl_objs.push({
+              'playlist_id': top_playlists[i]['id'],
+              'playlist_name': top_playlists[i]['name'],
+              'playlist_cover': top_playlists[i]['images'][top_playlists[i]['images'].length - 1]['url'],
+              'total_tracks': top_playlists[i]['tracks']['total']
+            })
+
+            req_get_tracks.push(
+              $.ajax({
+                url: top_playlists[i]['tracks']['href'],
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                data: {
+                  limit: 100,
+                  offset: 0,
+                  fields: 'items(track(id))'      // get `items[i]['track']['id']`
+                }
+              })
+            )
           }
-        }).then(function(resp) {
-          var top_tracks = [];
-          console.log(resp);
-        })
+
+          // TODO -> get all songs from playlist not just 100
+
+          // ONLY WHEN all of them are resolved, proceed further
+          Promise.all(req_get_tracks).then(function(pl_tracks) {
+            var track_ids_str = pl_tracks.map(function(tracks) {
+              return tracks['items'].map(d => d.track.id).join(',')
+            })
+
+            var ajax_reqs_l2 = [];
+            for(let i = 0; i < track_ids_str.length; i++) {
+              ajax_reqs_l2.push(
+                $.ajax({
+                  url: 'https://api.spotify.com/v1/audio-features',
+                  headers: {
+                    'Authorization': 'Bearer ' + access_token
+                  },
+                  data: {
+                    ids: track_ids_str[i]
+                  }
+                })
+              )
+            }
+
+            // console.log(ajax_reqs_l2);
+            Promise.all(ajax_reqs_l2).then(function(pl_features) {
+              for(let i = 0; i < top_max; i++) {
+                pl_objs[i]['danceability'] = categorise_value(d3.mean(pl_features[i]['audio_features'], d => d['danceability']))
+                pl_objs[i]['energy'] = d3.mean(pl_features[i]['audio_features'], d => d['energy'])
+                pl_objs[i]['acousticness'] = d3.mean(pl_features[i]['audio_features'], d => d['acousticness'])
+                pl_objs[i]['instrumentalness'] = d3.mean(pl_features[i]['audio_features'], d => d['instrumentalness'])
+                pl_objs[i]['liveness'] = d3.mean(pl_features[i]['audio_features'], d => d['liveness'])
+                pl_objs[i]['loudness'] = d3.mean(pl_features[i]['audio_features'], d => d['loudness'])
+                pl_objs[i]['speechiness'] = d3.mean(pl_features[i]['audio_features'], d => d['speechiness'])
+                pl_objs[i]['tempo'] = d3.mean(pl_features[i]['audio_features'], d => d['tempo'])
+                pl_objs[i]['valence'] = d3.mean(pl_features[i]['audio_features'], d => d['valence'])
+              }
+              console.log(pl_objs);
+              userPlaylistsPlaceholder.innerHTML = userPlaylistsTemplate({ pl: pl_objs })
+            })
+          });
+        });
+
+
+        // Parth 2 - Get user top tracks
+        // $.ajax({
+        //   url: 'https://api.spotify.com/v1/me/top/tracks',
+        //   headers: {
+        //     'Authorization': 'Bearer ' + access_token
+        //   },
+        //   data: {
+        //     limit: 50,
+        //     time_range: 'long_term'
+        //   }
+        // }).then(function(resp) {
+        //   var top_tracks = [];
+        //   console.log(resp);
+
+        //   // get all track features & avg them out (what mood I am in most of the time)
+        // })
 
       } else {
           // render initial screen
