@@ -16,7 +16,7 @@
 ## Playlists
 
 Scores
-  -> Dancability 
+  -> Dancability
   -> Energy
   -> Acousticness
   -> Instrumentalness

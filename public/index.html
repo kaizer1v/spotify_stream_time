@@ -105,22 +105,25 @@
     return hashParams;
   }
 
-  /* Handlebars */
-  var userProfileSource = document.getElementById('user-profile-template').innerHTML,
-      userProfileTemplate = Handlebars.compile(userProfileSource),
-      userProfilePlaceholder = document.getElementById('user-profile');
+  /**
+   * Utility function to templatize handlebars
+   */
+  function templatize(source_id, target_id) {
+    var source = document.getElementById(source_id).innerHTML,
+        fn = Handlebars.compile(source),
+        target = document.getElementById(target_id);
 
-  var userPlaylistsSource = document.getElementById('user-playlists-template').innerHTML,
-      userPlaylistsTemplate = Handlebars.compile(userPlaylistsSource),
-      userPlaylistsPlaceholder = document.getElementById('user-playlists');
+    return function(content) {
+      target.innerHTML = fn(content)
+    }
+  }
 
-
-  var oauthSource = document.getElementById('oauth-template').innerHTML,
-      oauthTemplate = Handlebars.compile(oauthSource),
-      oauthPlaceholder = document.getElementById('oauth');
+  // Create template functions
+  var rndr_userProfile = templatize('user-profile-template', 'user-profile');
+  var rndr_playlists = templatize('user-playlists-template', 'user-playlists');
+  var rndr_auth = templatize('oauth-template', 'oauth');
 
   var params = getHashParams();
-
   var access_token = params.access_token,
       refresh_token = params.refresh_token,
       error = params.error;
@@ -130,7 +133,7 @@
   } else {
     if(access_token) {
       // render oauth info
-      oauthPlaceholder.innerHTML = oauthTemplate({
+      rndr_auth({
         access_token: access_token,
         refresh_token: refresh_token
       });
@@ -143,8 +146,7 @@
             'Authorization': 'Bearer ' + access_token
           },
           success: function(response) {
-            console.log(response);
-            userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+            rndr_userProfile(response);
 
             $('#login').hide();
             $('#loggedin').show();
@@ -230,7 +232,7 @@
               pl_objs[i]['valence'] = d3.mean(pl_features[i]['audio_features'], d => d['valence'])
             }
             console.log(pl_objs);
-            userPlaylistsPlaceholder.innerHTML = userPlaylistsTemplate({ pl: pl_objs })
+            rndr_playlists({ pl: pl_objs })
           })
         });
       });
@@ -267,7 +269,7 @@
         }
       }).done(function(data) {
         access_token = data.access_token;
-        oauthPlaceholder.innerHTML = oauthTemplate({
+        rndr_auth({
           access_token: access_token,
           refresh_token: refresh_token
         });
