@@ -41,6 +41,7 @@ var generateRandomString = function(length) {
 var stateKey = 'spotify_auth_state';
 var keys = {};
 var app = express();
+var access_token, refresh_token;
 
 app.use(express.static(__dirname + '/public'))
    .use(cors())
@@ -52,7 +53,15 @@ app.get('/login', function(req, res) {
   res.cookie(stateKey, state);
 
   // your application requests authorization
-  var scope = 'user-read-private user-read-email playlist-read-private user-top-read';
+  var scope = [
+    'user-read-private',
+    'user-read-email',
+    'playlist-read-private',
+    'user-top-read',
+    'user-modify-playback-state',
+    'user-read-playback-state',
+    'user-read-currently-playing'
+  ].join(' ');
   res.redirect('https://accounts.spotify.com/authorize?' +
     querystring.stringify({
       response_type: 'code',
@@ -95,8 +104,8 @@ app.get('/callback', function(req, res) {
     request.post(authOptions, function(error, response, body) {
       if (!error && response.statusCode === 200) {
 
-        var access_token = body.access_token,
-            refresh_token = body.refresh_token;
+        access_token = body.access_token,
+        refresh_token = body.refresh_token;
 
         var options = {
           url: 'https://api.spotify.com/v1/me',
@@ -141,13 +150,29 @@ app.get('/refresh_token', function(req, res) {
 
   request.post(authOptions, function(error, response, body) {
     if (!error && response.statusCode === 200) {
-      var access_token = body.access_token;
+      access_token = body.access_token;
       res.send({
         'access_token': access_token
       });
     }
   });
 });
+
+// app.get('/testurl', function(req, res) {
+//   console.log(req.query.access_token);
+//   req_options = {
+//     url: 'https://api.spotify.com/v1/me/playlists',
+//     headers: {
+//       'Authorization': 'Bearer ' + req.query.access_token
+//     },
+//     data: {
+//       limit: 50
+//     }
+//   }
+//   request.post(req_options, function(error, response, body) {
+//     res.json(response)
+//   })
+// })
 
 console.log('Listening on 8888');
 app.listen(8888);
