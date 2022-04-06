@@ -1,0 +1,13 @@
+# Ignore folders
+
+raw_data/
+.ipynb_checkpoints/
+
+# Ignore file types
+*.pdf
+*.csv
+*.DS_Store
+
+# Ignore specific files
+INSTRUCTIONS.md
+compact.py
