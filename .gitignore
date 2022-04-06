@@ -11,3 +11,4 @@ raw_data/
 # Ignore specific files
 INSTRUCTIONS.md
 compact.py
+credentials.json

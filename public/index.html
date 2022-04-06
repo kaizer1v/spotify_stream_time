@@ -1,0 +1,366 @@
+<!doctype html>
+<html>
+<head>
+  <title>Spotify API Exploration</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+  <style type="text/css">
+    #login, #loggedin {
+      display: none;
+    }
+    .text-overflow {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      width: 500px;
+    }
+    section {
+      margin: 15px auto;
+      padding: 10px 0;
+      border-bottom: 2px solid #333;
+    }
+
+  </style>
+</head>
+
+<body>
+<div class="container">
+  <div id="login">
+    <h1>That's what Spotify Said</h1>
+    <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+  </div>
+  <div id="loggedin">
+    <!-- SECTION 1: Intro -->
+    <section>
+      <div id="user-profile"></div>
+    </section>
+
+    <section>
+      <button class="control" id="previous">Previous</button>
+      <button class="control" id="play">Play</button>
+      <button class="control" id="pause">Pause</button>
+      <button class="control" id="next">Next</button>
+    </section>
+
+    <!-- SECTION 2: Playlist Info -->
+    <section>
+      <h1>Top Playlists</h1>
+      <div id="user-playlists"></div>
+    </section>
+
+    <!-- SECTION Z: Tech Stuff (CAN BE REMOVED LATER) -->
+    <section>
+      <div id="oauth"></div>
+      <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button>
+    </section>
+
+  </div>
+</div>
+
+<script id="user-profile-template" type="text/x-handlebars-template">
+  <div class="media">
+    <div class="pull-left">
+      <img class="media-object" width="150" src="{{images.0.url}}" />
+    </div>
+    <div class="media-body">
+      <dl class="dl-horizontal">
+        <p>Hello <a href="{{external_urls.spotify}}">{{display_name}}</a>. This a story about your Spotify data</p>
+        <p>You have {{followers.total}} followers and are based out of {{country}}.</p>
+      </dl>
+    </div>
+  </div>
+</script>
+
+<script id="user-playlists-template" type="text/x-handlebars-template">
+  <div class="row row-cols-2 row-cols-md-2 g-4">
+    <div class="col">
+    {{#each pl}}
+      <div class="card">
+        <img src="{{playlist_cover}}" class="card-img-top" alt="Album Cover">
+        <div class="card-body">
+          <h5 class="card-title">{{playlist_name}}</h5>
+          <p class="card-text">
+            <ul class="list-group">
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Dancability
+                <span class="badge bg-primary rounded-pill">{{danceability}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Energy
+                <span class="badge bg-primary rounded-pill">{{energy}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Acousticness
+                <span class="badge bg-primary rounded-pill">{{acousticness}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Instrumentalness
+                <span class="badge bg-primary rounded-pill">{{instrumentalness}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Liveness
+                <span class="badge bg-primary rounded-pill">{{liveness}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Loudness
+                <span class="badge bg-primary rounded-pill">{{loudness}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Speechiness
+                <span class="badge bg-primary rounded-pill">{{speechiness}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Tempo
+                <span class="badge bg-primary rounded-pill">{{tempo}}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                Valence
+                <span class="badge bg-primary rounded-pill">{{valence}}</span>
+              </li>
+            </ul>
+          </p>
+          <a class="btn btn-primary" href="details.html#access_token={{access_token}}&refresh_token={{refres_token}}&plid={{id}}">View Playlist</a>
+        </div>
+      </div>
+    {{/each}}
+    </div>
+  </div>
+</script>
+
+<script id="oauth-template" type="text/x-handlebars-template">
+  <h2>oAuth info</h2>
+  <dl class="dl-horizontal">
+    <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+    <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+  </dl>
+</script>
+<script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js" integrity="sha384-b5kHyXgcpbZJO/tY9Ul7kGkf1S0CWuKcCD38l8YkeH8z8QjE0GmW1gYU5S9FOnJ0" crossorigin="anonymous"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.5.0/d3.min.js"></script>
+<script>
+(function() {
+
+  /**
+   * Obtains parameters from the hash of the URL
+   * @return Object
+   */
+  function getHashParams() {
+    var hashParams = {};
+    var e, r = /([^&;=]+)=?([^&;]*)/g,
+        q = window.location.hash.substring(1);
+    while(e = r.exec(q)) {
+      hashParams[e[1]] = decodeURIComponent(e[2]);
+    }
+    return hashParams;
+  }
+
+  /**
+   * Utility function to templatize handlebars
+   */
+  function templatize(source_id, target_id) {
+    var source = document.getElementById(source_id).innerHTML,
+        fn = Handlebars.compile(source),
+        target = document.getElementById(target_id);
+
+    return function(content) {
+      target.innerHTML = fn(content)
+    }
+  }
+
+  // Create template functions
+  var rndr_userProfile = templatize('user-profile-template', 'user-profile');
+  var rndr_playlists = templatize('user-playlists-template', 'user-playlists');
+  var rndr_auth = templatize('oauth-template', 'oauth');
+
+  var params = getHashParams();
+  var access_token = params.access_token,
+      refresh_token = params.refresh_token,
+      error = params.error;
+
+  if(error) {
+    alert('There was an error during the authentication');
+  } else {
+    if(access_token) {
+      // render oauth info
+      rndr_auth({
+        access_token: access_token,
+        refresh_token: refresh_token
+      });
+
+      $(".control").on("click", function(e) {
+        var control = $(this).attr('id');
+        var req_types = {
+          'play': 'PUT',
+          'pause': 'PUT',
+          'next': 'POST',
+          'previous': 'POST'
+        }
+
+        $.ajax({
+          type: req_types[control],
+          url: 'https://api.spotify.com/v1/me/player/' + control,
+          headers: {
+            'Authorization': 'Bearer ' + access_token
+          }
+        }).then(function(resp) {
+          console.log(control, '-ing...', resp);
+
+          // display which song is being played
+          if(control == 'next' || control == 'previous') {
+            $.ajax({
+              url: 'https://api.spotify.com/v1/me/player/currently-playing',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              }
+            }).then(function(resp) {
+              var track_name = resp['item']['name'];
+              var artists = resp['item']['artists'].map(a => a['name']).join(', ')
+              console.log(track_name, 'by', artists);
+            })
+          }
+        })
+
+      })
+
+      // var categorise_value = d3.scaleThreshold().domain([.5, .75, 1]).range(['low', 'med', 'high'])
+
+      $.ajax({
+        url: 'https://api.spotify.com/v1/me',
+        headers: {
+          'Authorization': 'Bearer ' + access_token
+        }
+      }).then(function(profile) {
+        rndr_userProfile(profile);
+        $('#login').hide();
+        $('#loggedin').show();
+      })
+
+      // // Part 1 - Get user playlists
+      // $.ajax({
+      //     url: 'https://api.spotify.com/v1/me/playlists',
+      //     headers: {
+      //       'Authorization': 'Bearer ' + access_token
+      //     },
+      //     data: {
+      //       limit: 50
+      //     }
+      // }).then(function(response) {
+      //   var top_max = 5;
+      //   var top_playlists = d3.sort(response['items'], (a, b) => d3.descending(a['tracks']['total'], b['tracks']['total'])).slice(0, top_max);            // choose top 5 playlists by track count
+      //   var req_get_tracks = [];
+      //   var pl_objs = [];
+      //   console.log(top_playlists);
+
+      //   // create array of all ajax requests
+      //   for(let i = 0; i < top_max; i++) {
+      //     pl_objs.push({
+      //       'playlist_id': top_playlists[i]['id'],
+      //       'playlist_name': top_playlists[i]['name'],
+      //       'playlist_cover': top_playlists[i]['images'][1]['url'],
+      //       'total_tracks': top_playlists[i]['tracks']['total']
+      //     })
+
+      //     req_get_tracks.push(
+      //       $.ajax({
+      //         url: top_playlists[i]['tracks']['href'],
+      //         headers: {
+      //           'Authorization': 'Bearer ' + access_token
+      //         },
+      //         data: {
+      //           limit: 100,
+      //           offset: 0,
+      //           fields: 'items(track(id)),items(added_at)'      // get `items[i]['track']['id']`
+      //         }
+      //       })
+      //     )
+      //   }
+
+      //   // TODO -> get all songs from playlist not just 100
+
+      //   // ONLY WHEN all of them are resolved, proceed further
+      //   Promise.all(req_get_tracks).then(function(pl_tracks) {
+      //     var track_ids_str = pl_tracks.map(function(tracks) {
+      //       return tracks['items'].map(d => d['track']['id']).join(',')
+      //     })
+
+      //     var ajax_reqs_l2 = [];
+      //     for(let i = 0; i < track_ids_str.length; i++) {
+      //       ajax_reqs_l2.push(
+      //         $.ajax({
+      //           url: 'https://api.spotify.com/v1/audio-features',
+      //           headers: {
+      //             'Authorization': 'Bearer ' + access_token
+      //           },
+      //           data: {
+      //             ids: track_ids_str[i]
+      //           }
+      //         })
+      //       )
+      //     }
+
+      //     // console.log(ajax_reqs_l2);
+      //     Promise.all(ajax_reqs_l2).then(function(pl_features) {
+      //       for(let i = 0; i < top_max; i++) {
+      //         pl_objs[i]['access_token'] = access_token
+      //         pl_objs[i]['refresh_token'] = refresh_token
+      //         pl_objs[i]['id'] = pl_objs[i]['playlist_id']
+      //         pl_objs[i]['danceability'] = categorise_value(d3.mean(pl_features[i]['audio_features'], d => d['danceability']))
+      //         pl_objs[i]['energy'] = d3.mean(pl_features[i]['audio_features'], d => d['energy'])
+      //         pl_objs[i]['acousticness'] = d3.mean(pl_features[i]['audio_features'], d => d['acousticness'])
+      //         pl_objs[i]['instrumentalness'] = d3.mean(pl_features[i]['audio_features'], d => d['instrumentalness'])
+      //         pl_objs[i]['liveness'] = d3.mean(pl_features[i]['audio_features'], d => d['liveness'])
+      //         pl_objs[i]['loudness'] = d3.mean(pl_features[i]['audio_features'], d => d['loudness'])
+      //         pl_objs[i]['speechiness'] = d3.mean(pl_features[i]['audio_features'], d => d['speechiness'])
+      //         pl_objs[i]['tempo'] = d3.mean(pl_features[i]['audio_features'], d => d['tempo'])
+      //         pl_objs[i]['valence'] = d3.mean(pl_features[i]['audio_features'], d => d['valence'])
+      //       }
+      //       console.log(pl_objs);
+      //       rndr_playlists({ pl: pl_objs })
+      //     })
+      //   });
+      // });
+
+
+      // Part 2 - Get user top tracks
+      // $.ajax({
+      //   url: 'https://api.spotify.com/v1/me/top/tracks',
+      //   headers: {
+      //     'Authorization': 'Bearer ' + access_token
+      //   },
+      //   data: {
+      //     limit: 50,
+      //     time_range: 'long_term'
+      //   }
+      // }).then(function(resp) {
+      //   var top_tracks = [];
+      //   console.log(resp);
+
+      //   // get all track features & avg them out (what mood I am in most of the time)
+      // })
+
+    } else {
+        // render initial screen
+        $('#login').show();
+        $('#loggedin').hide();
+    }
+
+    document.getElementById('obtain-new-token').addEventListener('click', function() {
+      $.ajax({
+        url: '/refresh_token',
+        data: {
+          'refresh_token': refresh_token
+        }
+      }).done(function(data) {
+        access_token = data.access_token;
+        rndr_auth({
+          access_token: access_token,
+          refresh_token: refresh_token
+        });
+      });
+    }, false);
+  }
+})();
+</script>
+</body>
+</html>
+
