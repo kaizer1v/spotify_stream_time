@@ -28,14 +28,9 @@
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script>
     // Sample data
-    const data = d3.csv("https://raw.githubusercontent.com/kaizer1v/spotify_stream_time/refs/heads/2025/neat_data/streaming_data_all.csv").then(d => {
-      return d.map(row => ({
-        ts: row.ts,
-        artist_name: row.artist_name,
-        track_name: row.track_name
-      }));
-    }).then(data => {
-      console.log(data)
+    const data = d3.csv("https://raw.githubusercontent.com/kaizer1v/spotify_stream_time/refs/heads/2025/neat_data/streaming_data_all.csv", d3.autoType).then(data => {
+
+      const top_artists = d3.groupSort(data, v => -d3.sum(v, d => d.ms_played), d => d.master_metadata_album_artist_name).slice(0, 10)
 
       const width = 1000;
       const height = 8000;
@@ -62,10 +57,9 @@
         return d.toLocaleTimeString();
       }
 
-      const top_artists = ["Artist 1", "Artist 2"];
       const artist_colors = d3.scaleOrdinal()
         .domain(top_artists)
-        .range(["tomato", "steelblue", "gold", "green"]);
+        .range(d3.schemeCategory10);
 
       const years = Array.from(new Set(data.map(d => new Date(d.ts).getFullYear()))).sort();
 
@@ -117,11 +111,11 @@
           .attr("cx", d => xScale(dateToHourFraction(d.ts)))
           .attr("cy", d => yScale(new Date(d.ts).getDate()) + 20)
           .attr("r", 5)
-          .attr("fill", d => top_artists.includes(d.artist_name) ? artist_colors(d.artist_name) : "gray")
+          .attr("fill", d => top_artists.includes(d.master_metadata_album_artist_name) ? artist_colors(d.master_metadata_album_artist_name) : "gray")
           .on("mouseover", function(event, d) {
             tooltip.transition().duration(100).style("opacity", 0.95);
             tooltip
-              .html(`<strong>${d.track_name}</strong><br>${d.artist_name}<br>${clockTime(d.ts)}`)
+              .html(`<strong>${d.track_name}</strong><br>${d.master_metadata_album_artist_name}<br>${clockTime(d.ts)}`)
               .style("left", event.pageX + 10 + "px")
               .style("top", event.pageY + 10 + "px");
           })
