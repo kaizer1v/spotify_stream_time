@@ -1,34 +1,136 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>D3 viz</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <style type="text/css">
-
-    svg { background: #eee; border: 1px solid #333; }
-
+  <meta charset="UTF-8" />
+  <title>D3 Hour-Day-Track Plot</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+    }
+    .dot {
+      opacity: 0.6;
+      cursor: pointer;
+    }
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #999;
+      padding: 6px;
+      font-size: 14px;
+      pointer-events: none;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body>
+  <svg id="chart" width="1000" height="8000"></svg>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script>
+    // Sample data
+    const data = d3.csv("https://raw.githubusercontent.com/kaizer1v/spotify_stream_time/refs/heads/2025/neat_data/streaming_data_all.csv").then(d => {
+      return d.map(row => ({
+        ts: row.ts,
+        artist_name: row.artist_name,
+        track_name: row.track_name
+      }));
+    }).then(data => {
+      console.log(data)
 
-<h1>Spotify Data Viz</h1>
+      const width = 1000;
+      const height = 8000;
+      const margin = { top: 40, right: 50, bottom: 40, left: 60 };
+      const innerWidth = width - margin.left - margin.right;
+      const innerHeight = height - margin.top - margin.bottom;
 
-<p id='tt'></p>
-<svg viewBox="0 0 200 200">
-  <!-- <rect x=10 y=10 width=75 height=50 fill="red"></rect> -->
-</svg>
+      const svg = d3.select("#chart")
+        .attr("width", width)
+        .attr("height", height);
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.3.0/d3.min.js" integrity="sha512-NMhzM2RHzbCRO0s5VPaRC+2bW6nmNXimzC9p5sp2x19M+zzuSJ2T50dEQ7hpHkNjnX1mt8nQg1NNthwRZgsoIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+      const g = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
 
-<!-- plot all streaming info by minute -->
-<script src="streaming.js"></script>
-<!-- <script src="bubble_graph.js"></script> -->
+      // === Custom Helpers ===
 
-<script type="text/javascript">
+      function dateToHourFraction(ts) {
+        const date = new Date(ts);
+        return date.getHours() + date.getMinutes() / 60;
+      }
 
+      function clockTime(ts) {
+        const d = new Date(ts);
+        return d.toLocaleTimeString();
+      }
 
+      const top_artists = ["Artist 1", "Artist 2"];
+      const artist_colors = d3.scaleOrdinal()
+        .domain(top_artists)
+        .range(["tomato", "steelblue", "gold", "green"]);
 
-</script>
+      const years = Array.from(new Set(data.map(d => new Date(d.ts).getFullYear()))).sort();
+
+      // === Scales ===
+      const xScale = d3.scaleLinear()
+        .domain([0, 24])
+        .range([0, innerWidth]);
+
+      const yScale = d3.scaleLinear()
+        .domain([1, 31])
+        .range([0, 600]); // height per year group
+
+      // Tooltip
+      const tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0);
+
+      // Draw dots for each year group
+      years.forEach((year, i) => {
+        const group = g.append("g").attr("transform", `translate(0, ${i * 650})`);
+
+        group.append("text")
+          .text(year)
+          .attr("x", -margin.left + 10)
+          .attr("y", 0)
+          .attr("font-weight", "bold");
+
+        // Axes
+        const xAxis = d3.axisTop(xScale)
+          .ticks(24)
+          .tickFormat(d => `${Math.floor(d)}:00`);
+        const yAxis = d3.axisLeft(yScale).ticks(30);
+
+        group.append("g")
+          .attr("transform", `translate(0, 20)`)
+          .call(xAxis);
+
+        group.append("g")
+          .attr("transform", `translate(0, 20)`)
+          .call(yAxis);
+
+        // Draw dots
+        group.selectAll("circle")
+          .data(data.filter(d => new Date(d.ts).getFullYear() === year))
+          .enter()
+          .append("circle")
+          .attr("class", "dot")
+          .attr("cx", d => xScale(dateToHourFraction(d.ts)))
+          .attr("cy", d => yScale(new Date(d.ts).getDate()) + 20)
+          .attr("r", 5)
+          .attr("fill", d => top_artists.includes(d.artist_name) ? artist_colors(d.artist_name) : "gray")
+          .on("mouseover", function(event, d) {
+            tooltip.transition().duration(100).style("opacity", 0.95);
+            tooltip
+              .html(`<strong>${d.track_name}</strong><br>${d.artist_name}<br>${clockTime(d.ts)}`)
+              .style("left", event.pageX + 10 + "px")
+              .style("top", event.pageY + 10 + "px");
+          })
+          .on("mouseout", () => {
+            tooltip.transition().duration(200).style("opacity", 0);
+          });
+      });
+    })
+
+  </script>
 </body>
 </html>
